@@ -148,5 +148,5 @@ All settings centralized:
 4. **One tool call maximum**: System prompt limits Claude to single search per query to control costs and latency
 
 5. **Session-based history**: Maintains conversation context while limiting token usage (`MAX_HISTORY=2`)
-- always use uv to run the server do not use pip directly. Also use uv to manage dependencies
-- Use uv to run python files.
+
+- Always use uv to run the server, do not use pip directly. Also use uv to manage dependencies.

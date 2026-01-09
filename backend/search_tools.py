@@ -89,36 +89,139 @@ class CourseSearchTool(Tool):
         """Format search results with course and lesson context"""
         formatted = []
         sources = []  # Track sources for the UI
-        
+
         for doc, meta in zip(results.documents, results.metadata):
             course_title = meta.get('course_title', 'unknown')
             lesson_num = meta.get('lesson_number')
-            
+
             # Build context header
             header = f"[{course_title}"
             if lesson_num is not None:
                 header += f" - Lesson {lesson_num}"
             header += "]"
-            
+
             # Track source for the UI
-            source = course_title
+            source_text = course_title
             if lesson_num is not None:
-                source += f" - Lesson {lesson_num}"
-            sources.append(source)
-            
+                source_text += f" - Lesson {lesson_num}"
+
+            # Look up lesson link if available
+            lesson_link = None
+            if lesson_num is not None:
+                lesson_link = self.store.get_lesson_link(course_title, lesson_num)
+
+            # Store as dict with text and URL
+            sources.append({"text": source_text, "url": lesson_link})
+
             formatted.append(f"{header}\n{doc}")
-        
+
         # Store sources for retrieval
         self.last_sources = sources
-        
+
         return "\n\n".join(formatted)
+
+
+class CourseOutlineTool(Tool):
+    """Tool for retrieving course outline with lesson structure"""
+
+    def __init__(self, vector_store: VectorStore):
+        self.store = vector_store
+        self.last_sources = []  # Track sources from last outline query
+
+    def get_tool_definition(self) -> Dict[str, Any]:
+        """Return Anthropic tool definition for this tool"""
+        return {
+            "name": "get_course_outline",
+            "description": "Get the complete outline and structure of a course including all lessons",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "course_title": {
+                        "type": "string",
+                        "description": "Course title (partial matches work, e.g. 'MCP', 'Introduction')"
+                    }
+                },
+                "required": ["course_title"]
+            }
+        }
+
+    def execute(self, course_title: str) -> str:
+        """
+        Execute the outline tool to retrieve course structure.
+
+        Args:
+            course_title: The course name/title to get outline for
+
+        Returns:
+            Formatted course outline or error message
+        """
+        import json
+
+        # Resolve course name using semantic search
+        resolved_title = self.store._resolve_course_name(course_title)
+
+        if not resolved_title:
+            return f"No course found matching '{course_title}'"
+
+        # Get course metadata from the catalog
+        try:
+            results = self.store.course_catalog.get(ids=[resolved_title])
+
+            if not results or not results.get('metadatas') or not results['metadatas']:
+                return f"Course metadata not found for '{resolved_title}'"
+
+            metadata = results['metadatas'][0]
+
+            # Extract course information
+            title = metadata.get('title', 'Unknown')
+            instructor = metadata.get('instructor', 'Unknown')
+            course_link = metadata.get('course_link')
+            lessons_json = metadata.get('lessons_json', '[]')
+
+            # Parse lessons
+            lessons = json.loads(lessons_json)
+
+            # Format the outline
+            formatted = [f"Course: {title}"]
+
+            if instructor:
+                formatted.append(f"Instructor: {instructor}")
+
+            if course_link:
+                formatted.append(f"Course Link: {course_link}")
+
+            formatted.append(f"\nLessons ({len(lessons)} total):")
+
+            # Track source for the UI
+            self.last_sources = [{
+                "text": title,
+                "url": course_link
+            }]
+
+            for lesson in lessons:
+                lesson_num = lesson.get('lesson_number')
+                lesson_title = lesson.get('lesson_title', 'Untitled')
+                lesson_link = lesson.get('lesson_link')
+
+                lesson_line = f"  Lesson {lesson_num}: {lesson_title}"
+                if lesson_link:
+                    lesson_line += f" ({lesson_link})"
+
+                formatted.append(lesson_line)
+
+            return "\n".join(formatted)
+
+        except Exception as e:
+            return f"Error retrieving course outline: {str(e)}"
+
 
 class ToolManager:
     """Manages available tools for the AI"""
-    
+
     def __init__(self):
         self.tools = {}
-    
+        self.accumulated_sources = []  # Accumulate sources across multiple tool calls
+
     def register_tool(self, tool: Tool):
         """Register any tool that implements the Tool interface"""
         tool_def = tool.get_tool_definition()
@@ -127,28 +230,35 @@ class ToolManager:
             raise ValueError("Tool must have a 'name' in its definition")
         self.tools[tool_name] = tool
 
-    
+
     def get_tool_definitions(self) -> list:
         """Get all tool definitions for Anthropic tool calling"""
         return [tool.get_tool_definition() for tool in self.tools.values()]
-    
+
     def execute_tool(self, tool_name: str, **kwargs) -> str:
         """Execute a tool by name with given parameters"""
         if tool_name not in self.tools:
             return f"Tool '{tool_name}' not found"
-        
-        return self.tools[tool_name].execute(**kwargs)
-    
+
+        result = self.tools[tool_name].execute(**kwargs)
+
+        # Accumulate sources from this tool execution
+        tool = self.tools[tool_name]
+        if hasattr(tool, 'last_sources') and tool.last_sources:
+            # Add sources that aren't already in the accumulated list (avoid duplicates)
+            for source in tool.last_sources:
+                if source not in self.accumulated_sources:
+                    self.accumulated_sources.append(source)
+
+        return result
+
     def get_last_sources(self) -> list:
-        """Get sources from the last search operation"""
-        # Check all tools for last_sources attribute
-        for tool in self.tools.values():
-            if hasattr(tool, 'last_sources') and tool.last_sources:
-                return tool.last_sources
-        return []
+        """Get all accumulated sources from tool executions"""
+        return self.accumulated_sources
 
     def reset_sources(self):
-        """Reset sources from all tools that track sources"""
+        """Reset accumulated sources and sources from all tools"""
+        self.accumulated_sources = []
         for tool in self.tools.values():
             if hasattr(tool, 'last_sources'):
                 tool.last_sources = []
