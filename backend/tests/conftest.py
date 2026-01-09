@@ -5,17 +5,18 @@ This module provides centralized mocks for ChromaDB and Anthropic API
 to enable isolated unit and integration testing.
 """
 
-import pytest
-import sys
 import os
-from unittest.mock import MagicMock, Mock
+import sys
 from typing import Any, Dict, List
+from unittest.mock import MagicMock, Mock
+
+import pytest
 
 # Add backend to path so we can import modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from config import Config
-from models import Course, Lesson, CourseChunk
+from models import Course, CourseChunk, Lesson
 from vector_store import SearchResults
 
 
@@ -29,23 +30,29 @@ def mock_chroma_collection():
     """
     mock = MagicMock()
     mock.query.return_value = {
-        'documents': [['Sample content from lesson about testing']],
-        'metadatas': [[{
-            'course_title': 'Test Course: Introduction to Testing',
-            'lesson_number': 1,
-            'chunk_index': 0
-        }]],
-        'distances': [[0.5]]
+        "documents": [["Sample content from lesson about testing"]],
+        "metadatas": [
+            [
+                {
+                    "course_title": "Test Course: Introduction to Testing",
+                    "lesson_number": 1,
+                    "chunk_index": 0,
+                }
+            ]
+        ],
+        "distances": [[0.5]],
     }
     mock.get.return_value = {
-        'ids': ['Test Course: Introduction to Testing'],
-        'metadatas': [{
-            'title': 'Test Course: Introduction to Testing',
-            'instructor': 'Test Instructor',
-            'course_link': 'https://example.com/course',
-            'lessons_json': '[{"lesson_number": 1, "lesson_title": "Getting Started", "lesson_link": "https://example.com/lesson1"}]',
-            'lesson_count': 1
-        }]
+        "ids": ["Test Course: Introduction to Testing"],
+        "metadatas": [
+            {
+                "title": "Test Course: Introduction to Testing",
+                "instructor": "Test Instructor",
+                "course_link": "https://example.com/course",
+                "lessons_json": '[{"lesson_number": 1, "lesson_title": "Getting Started", "lesson_link": "https://example.com/lesson1"}]',
+                "lesson_count": 1,
+            }
+        ],
     }
     return mock
 
@@ -61,7 +68,9 @@ def mock_anthropic_client():
 
     # Mock successful text response
     mock_response = MagicMock()
-    mock_response.content = [MagicMock(text="This is a test response from Claude", type="text")]
+    mock_response.content = [
+        MagicMock(text="This is a test response from Claude", type="text")
+    ]
     mock_response.stop_reason = "end_turn"
 
     mock_client.messages.create.return_value = mock_response
@@ -123,14 +132,14 @@ def sample_course():
             Lesson(
                 lesson_number=1,
                 title="Getting Started with Testing",
-                lesson_link="https://example.com/lesson1"
+                lesson_link="https://example.com/lesson1",
             ),
             Lesson(
                 lesson_number=2,
                 title="Advanced Testing Techniques",
-                lesson_link="https://example.com/lesson2"
+                lesson_link="https://example.com/lesson2",
             ),
-        ]
+        ],
     )
 
 
@@ -146,19 +155,19 @@ def sample_course_chunks(sample_course):
             content="This is lesson 1 content about testing fundamentals. We cover basic concepts.",
             course_title=sample_course.title,
             lesson_number=1,
-            chunk_index=0
+            chunk_index=0,
         ),
         CourseChunk(
             content="This is more content from lesson 1 about unit testing and best practices.",
             course_title=sample_course.title,
             lesson_number=1,
-            chunk_index=1
+            chunk_index=1,
         ),
         CourseChunk(
             content="Lesson 2 covers advanced topics like integration testing and mocking.",
             course_title=sample_course.title,
             lesson_number=2,
-            chunk_index=0
+            chunk_index=0,
         ),
     ]
 
@@ -168,11 +177,7 @@ def empty_search_results():
     """
     Empty SearchResults for testing error conditions.
     """
-    return SearchResults(
-        documents=[],
-        metadata=[],
-        distances=[]
-    )
+    return SearchResults(documents=[], metadata=[], distances=[])
 
 
 @pytest.fixture
@@ -190,10 +195,12 @@ def valid_search_results():
     """
     return SearchResults(
         documents=["Sample content about testing"],
-        metadata=[{
-            'course_title': 'Test Course: Introduction to Testing',
-            'lesson_number': 1,
-            'chunk_index': 0
-        }],
-        distances=[0.5]
+        metadata=[
+            {
+                "course_title": "Test Course: Introduction to Testing",
+                "lesson_number": 1,
+                "chunk_index": 0,
+            }
+        ],
+        distances=[0.5],
     )

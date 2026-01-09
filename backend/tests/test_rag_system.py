@@ -5,17 +5,18 @@ These tests verify the complete query flow through the RAG system,
 including how it handles the MAX_RESULTS=0 bug and API errors.
 """
 
-import pytest
-import sys
 import os
+import sys
 from unittest.mock import MagicMock, Mock, patch
 
-# Add backend to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import pytest
 
+# Add backend to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from models import CourseChunk
 from rag_system import RAGSystem
 from vector_store import SearchResults
-from models import CourseChunk
 
 
 def test_rag_system_initialization(test_config):
@@ -60,7 +61,9 @@ def test_query_with_buggy_max_results(mock_anthropic_client, mock_chroma_collect
     tool_response.stop_reason = "tool_use"
 
     final_response = MagicMock()
-    final_response.content = [MagicMock(text="I couldn't find relevant information", type="text")]
+    final_response.content = [
+        MagicMock(text="I couldn't find relevant information", type="text")
+    ]
     final_response.stop_reason = "end_turn"
 
     mock_anthropic_client.messages.create.side_effect = [tool_response, final_response]
@@ -79,7 +82,9 @@ def test_query_with_buggy_max_results(mock_anthropic_client, mock_chroma_collect
         pytest.fail(f"Query raised exception with MAX_RESULTS=0: {e}")
 
 
-def test_query_with_fixed_max_results(test_config, mock_anthropic_client, sample_course, sample_course_chunks):
+def test_query_with_fixed_max_results(
+    test_config, mock_anthropic_client, sample_course, sample_course_chunks
+):
     """
     Test that query works correctly when MAX_RESULTS is fixed.
 
@@ -99,10 +104,11 @@ def test_query_with_fixed_max_results(test_config, mock_anthropic_client, sample
     tool_response.stop_reason = "tool_use"
 
     final_response = MagicMock()
-    final_response.content = [MagicMock(
-        text="Lesson 1 covers testing fundamentals and basic concepts",
-        type="text"
-    )]
+    final_response.content = [
+        MagicMock(
+            text="Lesson 1 covers testing fundamentals and basic concepts", type="text"
+        )
+    ]
     final_response.stop_reason = "end_turn"
 
     mock_anthropic_client.messages.create.side_effect = [tool_response, final_response]
@@ -112,16 +118,13 @@ def test_query_with_fixed_max_results(test_config, mock_anthropic_client, sample
     mock_store = MagicMock()
     mock_store.search.return_value = SearchResults(
         documents=["This is lesson 1 content about testing fundamentals"],
-        metadata=[{
-            'course_title': sample_course.title,
-            'lesson_number': 1
-        }],
-        distances=[0.3]
+        metadata=[{"course_title": sample_course.title, "lesson_number": 1}],
+        distances=[0.3],
     )
     mock_store.get_lesson_link.return_value = "https://example.com/lesson1"
 
     # Replace the search tool's store
-    rag.tool_manager.tools['search_course_content'].store = mock_store
+    rag.tool_manager.tools["search_course_content"].store = mock_store
 
     # Execute query
     answer, sources = rag.query("What's in lesson 1?", session_id="test_session")
@@ -149,9 +152,7 @@ def test_query_exception_propagation(test_config, mock_anthropic_client):
 
     # Make API raise an error
     api_error = anthropic.APIError(
-        message="API Error",
-        request=Mock(),
-        body={"error": {"message": "API Error"}}
+        message="API Error", request=Mock(), body={"error": {"message": "API Error"}}
     )
     mock_anthropic_client.messages.create.side_effect = api_error
 
@@ -218,12 +219,12 @@ def test_sources_tracking(test_config, mock_anthropic_client):
     mock_store = MagicMock()
     mock_store.search.return_value = SearchResults(
         documents=["Source content"],
-        metadata=[{'course_title': 'Test Course', 'lesson_number': 1}],
-        distances=[0.5]
+        metadata=[{"course_title": "Test Course", "lesson_number": 1}],
+        distances=[0.5],
     )
     mock_store.get_lesson_link.return_value = "https://example.com/lesson1"
 
-    rag.tool_manager.tools['search_course_content'].store = mock_store
+    rag.tool_manager.tools["search_course_content"].store = mock_store
 
     # Execute query
     answer, sources = rag.query("test query", session_id="test_session")
@@ -231,8 +232,8 @@ def test_sources_tracking(test_config, mock_anthropic_client):
     # Sources should be returned
     assert isinstance(sources, list)
     assert len(sources) > 0
-    assert 'text' in sources[0]
-    assert 'url' in sources[0]
+    assert "text" in sources[0]
+    assert "url" in sources[0]
 
 
 def test_query_without_tools(test_config, mock_anthropic_client):

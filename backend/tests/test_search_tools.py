@@ -5,15 +5,16 @@ These tests confirm that tools handle empty results and errors gracefully,
 and that the ToolManager correctly routes tool calls.
 """
 
-import pytest
-import sys
 import os
+import sys
 from unittest.mock import MagicMock
 
-# Add backend to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import pytest
 
-from search_tools import CourseSearchTool, CourseOutlineTool, ToolManager
+# Add backend to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from search_tools import CourseOutlineTool, CourseSearchTool, ToolManager
 from vector_store import SearchResults
 
 
@@ -27,18 +28,16 @@ def test_search_tool_with_empty_results():
     # Create mock VectorStore that returns empty results
     mock_store = MagicMock()
     mock_store.search.return_value = SearchResults(
-        documents=[],
-        metadata=[],
-        distances=[]
+        documents=[], metadata=[], distances=[]
     )
 
     tool = CourseSearchTool(mock_store)
     result = tool.execute(query="test query")
 
     # Should return "No relevant content found" message
-    assert "No relevant content found" in result, (
-        "Should return empty result message when no results found"
-    )
+    assert (
+        "No relevant content found" in result
+    ), "Should return empty result message when no results found"
 
 
 def test_search_tool_with_error():
@@ -50,16 +49,18 @@ def test_search_tool_with_error():
     """
     # Create mock VectorStore that returns error
     mock_store = MagicMock()
-    mock_store.search.return_value = SearchResults.empty("Search error: MAX_RESULTS is 0")
+    mock_store.search.return_value = SearchResults.empty(
+        "Search error: MAX_RESULTS is 0"
+    )
 
     tool = CourseSearchTool(mock_store)
     result = tool.execute(query="test query")
 
     # Should return the error message
     assert "Search error" in result, "Should return error message"
-    assert "MAX_RESULTS" in result or "error" in result.lower(), (
-        "Error message should be descriptive"
-    )
+    assert (
+        "MAX_RESULTS" in result or "error" in result.lower()
+    ), "Error message should be descriptive"
 
 
 def test_search_tool_result_formatting(valid_search_results):
@@ -72,11 +73,10 @@ def test_search_tool_result_formatting(valid_search_results):
     mock_store = MagicMock()
     mock_store.search.return_value = SearchResults(
         documents=["Content from lesson 1 about testing basics"],
-        metadata=[{
-            'course_title': 'Test Course: Introduction to Testing',
-            'lesson_number': 1
-        }],
-        distances=[0.5]
+        metadata=[
+            {"course_title": "Test Course: Introduction to Testing", "lesson_number": 1}
+        ],
+        distances=[0.5],
     )
     mock_store.get_lesson_link.return_value = "https://example.com/lesson1"
 
@@ -84,15 +84,18 @@ def test_search_tool_result_formatting(valid_search_results):
     result = tool.execute(query="testing basics", course_name="Test Course")
 
     # Verify formatting
-    assert "[Test Course: Introduction to Testing - Lesson 1]" in result, (
-        "Should include course and lesson header"
-    )
+    assert (
+        "[Test Course: Introduction to Testing - Lesson 1]" in result
+    ), "Should include course and lesson header"
     assert "Content from lesson 1" in result, "Should include content"
 
     # Verify sources tracking
     assert len(tool.last_sources) == 1, "Should track one source"
-    assert tool.last_sources[0]['text'] == "Test Course: Introduction to Testing - Lesson 1"
-    assert tool.last_sources[0]['url'] == "https://example.com/lesson1"
+    assert (
+        tool.last_sources[0]["text"]
+        == "Test Course: Introduction to Testing - Lesson 1"
+    )
+    assert tool.last_sources[0]["url"] == "https://example.com/lesson1"
 
 
 def test_search_tool_multiple_results():
@@ -103,17 +106,17 @@ def test_search_tool_multiple_results():
     mock_store.search.return_value = SearchResults(
         documents=[
             "First result about testing",
-            "Second result about advanced testing"
+            "Second result about advanced testing",
         ],
         metadata=[
-            {'course_title': 'Test Course', 'lesson_number': 1},
-            {'course_title': 'Test Course', 'lesson_number': 2}
+            {"course_title": "Test Course", "lesson_number": 1},
+            {"course_title": "Test Course", "lesson_number": 2},
         ],
-        distances=[0.3, 0.5]
+        distances=[0.3, 0.5],
     )
     mock_store.get_lesson_link.side_effect = [
         "https://example.com/lesson1",
-        "https://example.com/lesson2"
+        "https://example.com/lesson2",
     ]
 
     tool = CourseSearchTool(mock_store)
@@ -133,12 +136,12 @@ def test_search_tool_get_tool_definition():
     tool = CourseSearchTool(mock_store)
     definition = tool.get_tool_definition()
 
-    assert definition['name'] == 'search_course_content'
-    assert 'description' in definition
-    assert 'input_schema' in definition
-    assert definition['input_schema']['type'] == 'object'
-    assert 'query' in definition['input_schema']['properties']
-    assert 'query' in definition['input_schema']['required']
+    assert definition["name"] == "search_course_content"
+    assert "description" in definition
+    assert "input_schema" in definition
+    assert definition["input_schema"]["type"] == "object"
+    assert "query" in definition["input_schema"]["properties"]
+    assert "query" in definition["input_schema"]["required"]
 
 
 def test_tool_manager_execute():
@@ -148,7 +151,9 @@ def test_tool_manager_execute():
     Verifies that ToolManager can register and execute tools.
     """
     mock_store = MagicMock()
-    mock_store.search.return_value = SearchResults(documents=[], metadata=[], distances=[])
+    mock_store.search.return_value = SearchResults(
+        documents=[], metadata=[], distances=[]
+    )
 
     tool_manager = ToolManager()
     search_tool = CourseSearchTool(mock_store)
@@ -189,8 +194,8 @@ def test_tool_manager_get_tool_definitions():
     definitions = tool_manager.get_tool_definitions()
 
     assert len(definitions) == 2
-    assert any(d['name'] == 'search_course_content' for d in definitions)
-    assert any(d['name'] == 'get_course_outline' for d in definitions)
+    assert any(d["name"] == "search_course_content" for d in definitions)
+    assert any(d["name"] == "get_course_outline" for d in definitions)
 
 
 def test_tool_manager_get_last_sources():
@@ -200,8 +205,8 @@ def test_tool_manager_get_last_sources():
     mock_store = MagicMock()
     mock_store.search.return_value = SearchResults(
         documents=["Content"],
-        metadata=[{'course_title': 'Test Course', 'lesson_number': 1}],
-        distances=[0.5]
+        metadata=[{"course_title": "Test Course", "lesson_number": 1}],
+        distances=[0.5],
     )
     mock_store.get_lesson_link.return_value = "https://example.com/lesson1"
 
@@ -216,7 +221,7 @@ def test_tool_manager_get_last_sources():
     sources = tool_manager.get_last_sources()
 
     assert len(sources) == 1
-    assert sources[0]['text'] == "Test Course - Lesson 1"
+    assert sources[0]["text"] == "Test Course - Lesson 1"
 
 
 def test_tool_manager_reset_sources():
@@ -226,8 +231,8 @@ def test_tool_manager_reset_sources():
     mock_store = MagicMock()
     mock_store.search.return_value = SearchResults(
         documents=["Content"],
-        metadata=[{'course_title': 'Test', 'lesson_number': 1}],
-        distances=[0.5]
+        metadata=[{"course_title": "Test", "lesson_number": 1}],
+        distances=[0.5],
     )
     mock_store.get_lesson_link.return_value = "https://example.com/lesson1"
 
@@ -252,9 +257,9 @@ def test_course_outline_tool_get_definition():
     tool = CourseOutlineTool(mock_store)
     definition = tool.get_tool_definition()
 
-    assert definition['name'] == 'get_course_outline'
-    assert 'description' in definition
-    assert 'course_title' in definition['input_schema']['properties']
+    assert definition["name"] == "get_course_outline"
+    assert "description" in definition
+    assert "course_title" in definition["input_schema"]["properties"]
 
 
 def test_course_outline_tool_execute():
@@ -268,12 +273,14 @@ def test_course_outline_tool_execute():
 
     # Mock course catalog get
     mock_store.course_catalog.get.return_value = {
-        'metadatas': [{
-            'title': 'Test Course: Introduction',
-            'instructor': 'Test Instructor',
-            'course_link': 'https://example.com/course',
-            'lessons_json': '[{"lesson_number": 1, "lesson_title": "Lesson 1", "lesson_link": "https://example.com/lesson1"}]'
-        }]
+        "metadatas": [
+            {
+                "title": "Test Course: Introduction",
+                "instructor": "Test Instructor",
+                "course_link": "https://example.com/course",
+                "lessons_json": '[{"lesson_number": 1, "lesson_title": "Lesson 1", "lesson_link": "https://example.com/lesson1"}]',
+            }
+        ]
     }
 
     tool = CourseOutlineTool(mock_store)

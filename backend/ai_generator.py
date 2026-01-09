@@ -1,10 +1,12 @@
+from typing import Any, Dict, List, Optional
+
 import anthropic
-from typing import List, Optional, Dict, Any
 from config import config
+
 
 class AIGenerator:
     """Handles interactions with Anthropic's Claude API for generating responses"""
-    
+
     # Static system prompt to avoid rebuilding on each call
     SYSTEM_PROMPT = """ You are an AI assistant specialized in course materials and educational content with access to comprehensive tools for course information.
 
@@ -42,22 +44,21 @@ All responses must be:
 4. **Example-supported** - Include relevant examples when they aid understanding
 Provide only the direct answer to what was asked.
 """
-    
+
     def __init__(self, api_key: str, model: str):
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = model
-        
+
         # Pre-build base API parameters
-        self.base_params = {
-            "model": self.model,
-            "temperature": 0,
-            "max_tokens": 800
-        }
-    
-    def generate_response(self, query: str,
-                         conversation_history: Optional[str] = None,
-                         tools: Optional[List] = None,
-                         tool_manager=None) -> str:
+        self.base_params = {"model": self.model, "temperature": 0, "max_tokens": 800}
+
+    def generate_response(
+        self,
+        query: str,
+        conversation_history: Optional[str] = None,
+        tools: Optional[List] = None,
+        tool_manager=None,
+    ) -> str:
         """
         Generate AI response with multi-round tool usage support.
 
@@ -82,10 +83,7 @@ Provide only the direct answer to what was asked.
         messages = [{"role": "user", "content": query}]
 
         # Prepare base API parameters
-        api_params = {
-            **self.base_params,
-            "system": system_content
-        }
+        api_params = {**self.base_params, "system": system_content}
 
         # Add tools if available
         if tools:
@@ -103,19 +101,26 @@ Provide only the direct answer to what was asked.
             # Make API call with current messages (use copy to avoid mutation issues in tests)
             try:
                 response = self.client.messages.create(
-                    **api_params,
-                    messages=messages.copy()
+                    **api_params, messages=messages.copy()
                 )
             except anthropic.AuthenticationError as e:
-                raise Exception(f"Anthropic API authentication failed: {str(e)}. Please check your API key in .env file.")
+                raise Exception(
+                    f"Anthropic API authentication failed: {str(e)}. Please check your API key in .env file."
+                )
             except anthropic.BadRequestError as e:
                 if "credit balance" in str(e).lower():
-                    raise Exception("Anthropic API credit balance is too low. Please add credits to your account at https://console.anthropic.com/")
+                    raise Exception(
+                        "Anthropic API credit balance is too low. Please add credits to your account at https://console.anthropic.com/"
+                    )
                 raise Exception(f"Anthropic API request error: {str(e)}")
             except anthropic.RateLimitError as e:
-                raise Exception("Anthropic API rate limit exceeded. Please wait a moment and try again.")
+                raise Exception(
+                    "Anthropic API rate limit exceeded. Please wait a moment and try again."
+                )
             except anthropic.APIError as e:
-                raise Exception(f"Anthropic API error: {str(e)}. The service may be temporarily unavailable. Please try again later.")
+                raise Exception(
+                    f"Anthropic API error: {str(e)}. The service may be temporarily unavailable. Please try again later."
+                )
 
             # Check termination condition: Claude doesn't want to use tools
             if response.stop_reason != "tool_use":
@@ -132,18 +137,21 @@ Provide only the direct answer to what was asked.
 
         # Max rounds reached - make one final API call without tools to get synthesized answer
         # Remove tools to force Claude to provide a text response
-        final_params = {k: v for k, v in api_params.items() if k not in ('tools', 'tool_choice')}
+        final_params = {
+            k: v for k, v in api_params.items() if k not in ("tools", "tool_choice")
+        }
         try:
             final_response = self.client.messages.create(
-                **final_params,
-                messages=messages.copy()
+                **final_params, messages=messages.copy()
             )
             return self._extract_text_from_response(final_response)
         except Exception:
             # If final call fails, return whatever text we have from the last response
             return self._extract_text_from_response(response)
-    
-    def _execute_tools_and_update_messages(self, messages: List[Dict], response, tool_manager) -> List[Dict]:
+
+    def _execute_tools_and_update_messages(
+        self, messages: List[Dict], response, tool_manager
+    ) -> List[Dict]:
         """
         Execute all tools in a response and update the messages array.
 
@@ -164,24 +172,27 @@ Provide only the direct answer to what was asked.
             if content_block.type == "tool_use":
                 try:
                     tool_result = tool_manager.execute_tool(
-                        content_block.name,
-                        **content_block.input
+                        content_block.name, **content_block.input
                     )
 
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": content_block.id,
-                        "content": tool_result
-                    })
+                    tool_results.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": content_block.id,
+                            "content": tool_result,
+                        }
+                    )
                 except Exception as e:
                     # Tool execution failed - return error to Claude
                     error_msg = f"Error executing tool {content_block.name}: {str(e)}"
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": content_block.id,
-                        "content": error_msg,
-                        "is_error": True
-                    })
+                    tool_results.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": content_block.id,
+                            "content": error_msg,
+                            "is_error": True,
+                        }
+                    )
 
         # Add tool results as user message
         if tool_results:

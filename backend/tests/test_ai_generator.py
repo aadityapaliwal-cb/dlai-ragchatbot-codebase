@@ -5,16 +5,17 @@ These tests verify AIGenerator's tool calling flow and prove that
 Anthropic API errors are NOT caught, causing HTTP 500 errors.
 """
 
-import pytest
-import sys
 import os
+import sys
 from unittest.mock import MagicMock, Mock
 
+import pytest
+
 # Add backend to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from ai_generator import AIGenerator
-from search_tools import ToolManager, CourseSearchTool
+from search_tools import CourseSearchTool, ToolManager
 from vector_store import SearchResults
 
 
@@ -35,9 +36,9 @@ def test_generate_response_without_tools(mock_anthropic_client):
     # Verify API was called correctly
     mock_anthropic_client.messages.create.assert_called_once()
     call_args = mock_anthropic_client.messages.create.call_args
-    assert call_args.kwargs['model'] == "claude-sonnet-4-20250514"
-    assert call_args.kwargs['temperature'] == 0
-    assert call_args.kwargs['max_tokens'] == 800
+    assert call_args.kwargs["model"] == "claude-sonnet-4-20250514"
+    assert call_args.kwargs["temperature"] == 0
+    assert call_args.kwargs["max_tokens"] == 800
 
 
 def test_generate_response_with_conversation_history(mock_anthropic_client):
@@ -49,13 +50,12 @@ def test_generate_response_with_conversation_history(mock_anthropic_client):
 
     history = "User: Previous question\nAssistant: Previous answer"
     response = generator.generate_response(
-        query="Follow-up question",
-        conversation_history=history
+        query="Follow-up question", conversation_history=history
     )
 
     # Verify system prompt includes history
     call_args = mock_anthropic_client.messages.create.call_args
-    system_content = call_args.kwargs['system']
+    system_content = call_args.kwargs["system"]
     assert "Previous conversation:" in system_content
     assert history in system_content
 
@@ -68,24 +68,23 @@ def test_generate_response_with_tool_use(mock_anthropic_client, mock_tool_use_re
     """
     # Setup mock to return tool use, then final response
     final_response = MagicMock()
-    final_response.content = [MagicMock(
-        text="Here's what I found about testing basics",
-        type="text"
-    )]
+    final_response.content = [
+        MagicMock(text="Here's what I found about testing basics", type="text")
+    ]
     final_response.stop_reason = "end_turn"
 
     mock_anthropic_client.messages.create.side_effect = [
         mock_tool_use_response,  # First call: tool use
-        final_response           # Second call: final answer
+        final_response,  # Second call: final answer
     ]
 
     # Setup tool manager
     mock_store = MagicMock()
     mock_store.search.return_value = SearchResults(
         documents=["Content about testing basics"],
-        metadata=[{'course_title': 'Test Course', 'lesson_number': 1}],
+        metadata=[{"course_title": "Test Course", "lesson_number": 1}],
         distances=[0.5],
-        error=None
+        error=None,
     )
     mock_store.get_lesson_link.return_value = "https://example.com/lesson1"
 
@@ -100,7 +99,7 @@ def test_generate_response_with_tool_use(mock_anthropic_client, mock_tool_use_re
     response = generator.generate_response(
         query="Tell me about testing basics",
         tools=tool_manager.get_tool_definitions(),
-        tool_manager=tool_manager
+        tool_manager=tool_manager,
     )
 
     # Should call API twice (initial + follow-up)
@@ -125,7 +124,7 @@ def test_api_error_propagates(mock_anthropic_client):
     api_error = anthropic.AuthenticationError(
         message="Invalid API key",
         response=mock_response,
-        body={"error": {"message": "Invalid API key"}}
+        body={"error": {"message": "Invalid API key"}},
     )
     mock_anthropic_client.messages.create.side_effect = api_error
 
@@ -155,7 +154,7 @@ def test_api_credit_error_propagates(mock_anthropic_client):
     api_error = anthropic.BadRequestError(
         message="credit balance too low",
         response=mock_response,
-        body={"error": {"message": "credit balance too low"}}
+        body={"error": {"message": "credit balance too low"}},
     )
     mock_anthropic_client.messages.create.side_effect = api_error
 
@@ -182,7 +181,7 @@ def test_api_rate_limit_error_propagates(mock_anthropic_client):
     api_error = anthropic.RateLimitError(
         message="Rate limit exceeded",
         response=mock_response,
-        body={"error": {"message": "Rate limit exceeded"}}
+        body={"error": {"message": "Rate limit exceeded"}},
     )
     mock_anthropic_client.messages.create.side_effect = api_error
 
@@ -208,7 +207,7 @@ def test_api_generic_error_propagates(mock_anthropic_client):
     api_error = anthropic.APIError(
         message="Service temporarily unavailable",
         request=Mock(),
-        body={"error": {"message": "Service temporarily unavailable"}}
+        body={"error": {"message": "Service temporarily unavailable"}},
     )
     mock_anthropic_client.messages.create.side_effect = api_error
 
@@ -249,17 +248,14 @@ def test_tool_execution_with_multiple_tools(mock_anthropic_client):
     final_response.content = [MagicMock(text="Combined answer", type="text")]
     final_response.stop_reason = "end_turn"
 
-    mock_anthropic_client.messages.create.side_effect = [
-        tool_response,
-        final_response
-    ]
+    mock_anthropic_client.messages.create.side_effect = [tool_response, final_response]
 
     # Setup tool manager
     mock_store = MagicMock()
     mock_store.search.return_value = SearchResults(
         documents=["Result"],
-        metadata=[{'course_title': 'Test', 'lesson_number': 1}],
-        distances=[0.5]
+        metadata=[{"course_title": "Test", "lesson_number": 1}],
+        distances=[0.5],
     )
     mock_store.get_lesson_link.return_value = "https://example.com/lesson1"
 
@@ -273,7 +269,7 @@ def test_tool_execution_with_multiple_tools(mock_anthropic_client):
     response = generator.generate_response(
         query="test",
         tools=tool_manager.get_tool_definitions(),
-        tool_manager=tool_manager
+        tool_manager=tool_manager,
     )
 
     # Both tools should be executed
@@ -298,19 +294,17 @@ def test_base_params_initialization():
     """
     Test that AIGenerator initializes with correct base parameters.
     """
-    generator = AIGenerator(
-        api_key="test-key",
-        model="claude-sonnet-4-20250514"
-    )
+    generator = AIGenerator(api_key="test-key", model="claude-sonnet-4-20250514")
 
-    assert generator.base_params['model'] == "claude-sonnet-4-20250514"
-    assert generator.base_params['temperature'] == 0
-    assert generator.base_params['max_tokens'] == 800
+    assert generator.base_params["model"] == "claude-sonnet-4-20250514"
+    assert generator.base_params["temperature"] == 0
+    assert generator.base_params["max_tokens"] == 800
 
 
 # ============================================================================
 # Multi-Round Tool Calling Tests
 # ============================================================================
+
 
 def test_two_round_tool_calling_success(mock_anthropic_client):
     """
@@ -343,21 +337,26 @@ def test_two_round_tool_calling_success(mock_anthropic_client):
 
     # Final response after max rounds
     final_response = MagicMock()
-    final_response.content = [MagicMock(text="Here's the comparison of Python basics and advanced topics", type="text")]
+    final_response.content = [
+        MagicMock(
+            text="Here's the comparison of Python basics and advanced topics",
+            type="text",
+        )
+    ]
     final_response.stop_reason = "end_turn"
 
     mock_anthropic_client.messages.create.side_effect = [
         tool_response_1,
         tool_response_2,
-        final_response
+        final_response,
     ]
 
     # Setup tool manager
     mock_store = MagicMock()
     mock_store.search.return_value = SearchResults(
         documents=["Content about Python"],
-        metadata=[{'course_title': 'Python Course', 'lesson_number': 1}],
-        distances=[0.5]
+        metadata=[{"course_title": "Python Course", "lesson_number": 1}],
+        distances=[0.5],
     )
     mock_store.get_lesson_link.return_value = "https://example.com/lesson1"
 
@@ -371,7 +370,7 @@ def test_two_round_tool_calling_success(mock_anthropic_client):
     response = generator.generate_response(
         query="Compare Python basics and advanced topics",
         tools=tool_manager.get_tool_definitions(),
-        tool_manager=tool_manager
+        tool_manager=tool_manager,
     )
 
     # Verify: 3 API calls (2 rounds + final synthesis)
@@ -390,7 +389,9 @@ def test_early_termination_no_tool_use_round_1(mock_anthropic_client):
     """
     # Mock: response with no tool use
     direct_response = MagicMock()
-    direct_response.content = [MagicMock(text="This is a general knowledge answer", type="text")]
+    direct_response.content = [
+        MagicMock(text="This is a general knowledge answer", type="text")
+    ]
     direct_response.stop_reason = "end_turn"
 
     mock_anthropic_client.messages.create.return_value = direct_response
@@ -425,20 +426,19 @@ def test_mid_round_termination_round_2(mock_anthropic_client):
 
     # Round 2: final answer (no more tools)
     final_response = MagicMock()
-    final_response.content = [MagicMock(text="Based on the search, here's the answer", type="text")]
+    final_response.content = [
+        MagicMock(text="Based on the search, here's the answer", type="text")
+    ]
     final_response.stop_reason = "end_turn"
 
-    mock_anthropic_client.messages.create.side_effect = [
-        tool_response,
-        final_response
-    ]
+    mock_anthropic_client.messages.create.side_effect = [tool_response, final_response]
 
     # Setup tool manager
     mock_store = MagicMock()
     mock_store.search.return_value = SearchResults(
         documents=["Testing content"],
-        metadata=[{'course_title': 'Test Course', 'lesson_number': 1}],
-        distances=[0.5]
+        metadata=[{"course_title": "Test Course", "lesson_number": 1}],
+        distances=[0.5],
     )
     mock_store.get_lesson_link.return_value = "https://example.com/lesson1"
 
@@ -452,7 +452,7 @@ def test_mid_round_termination_round_2(mock_anthropic_client):
     response = generator.generate_response(
         query="Tell me about testing",
         tools=tool_manager.get_tool_definitions(),
-        tool_manager=tool_manager
+        tool_manager=tool_manager,
     )
 
     # Verify: 2 API calls (round 1 + final)
@@ -489,21 +489,23 @@ def test_max_rounds_reached_with_final_text(mock_anthropic_client):
 
     # Final synthesis response
     final_response = MagicMock()
-    final_response.content = [MagicMock(text="Here's what I found from both searches", type="text")]
+    final_response.content = [
+        MagicMock(text="Here's what I found from both searches", type="text")
+    ]
     final_response.stop_reason = "end_turn"
 
     mock_anthropic_client.messages.create.side_effect = [
         tool_response_1,
         tool_response_2,
-        final_response
+        final_response,
     ]
 
     # Setup tool manager
     mock_store = MagicMock()
     mock_store.search.return_value = SearchResults(
         documents=["Content"],
-        metadata=[{'course_title': 'Course', 'lesson_number': 1}],
-        distances=[0.5]
+        metadata=[{"course_title": "Course", "lesson_number": 1}],
+        distances=[0.5],
     )
     mock_store.get_lesson_link.return_value = "https://example.com/lesson1"
 
@@ -517,7 +519,7 @@ def test_max_rounds_reached_with_final_text(mock_anthropic_client):
     response = generator.generate_response(
         query="Complex query",
         tools=tool_manager.get_tool_definitions(),
-        tool_manager=tool_manager
+        tool_manager=tool_manager,
     )
 
     # Verify: 3 API calls (2 rounds + final synthesis)
@@ -544,13 +546,14 @@ def test_tool_execution_error_in_round_1(mock_anthropic_client):
 
     # Round 2: Claude acknowledges error
     final_response = MagicMock()
-    final_response.content = [MagicMock(text="I encountered an error searching. Please try again.", type="text")]
+    final_response.content = [
+        MagicMock(
+            text="I encountered an error searching. Please try again.", type="text"
+        )
+    ]
     final_response.stop_reason = "end_turn"
 
-    mock_anthropic_client.messages.create.side_effect = [
-        tool_response,
-        final_response
-    ]
+    mock_anthropic_client.messages.create.side_effect = [tool_response, final_response]
 
     # Setup tool manager that raises exception
     mock_store = MagicMock()
@@ -567,7 +570,7 @@ def test_tool_execution_error_in_round_1(mock_anthropic_client):
     response = generator.generate_response(
         query="Search for something",
         tools=tool_manager.get_tool_definitions(),
-        tool_manager=tool_manager
+        tool_manager=tool_manager,
     )
 
     # Verify: System continued to round 2 despite error
@@ -597,17 +600,14 @@ def test_messages_array_grows_correctly(mock_anthropic_client):
     final_response.content = [MagicMock(text="Final answer", type="text")]
     final_response.stop_reason = "end_turn"
 
-    mock_anthropic_client.messages.create.side_effect = [
-        tool_response,
-        final_response
-    ]
+    mock_anthropic_client.messages.create.side_effect = [tool_response, final_response]
 
     # Setup tool manager
     mock_store = MagicMock()
     mock_store.search.return_value = SearchResults(
         documents=["Content"],
-        metadata=[{'course_title': 'Course', 'lesson_number': 1}],
-        distances=[0.5]
+        metadata=[{"course_title": "Course", "lesson_number": 1}],
+        distances=[0.5],
     )
     mock_store.get_lesson_link.return_value = "https://example.com/lesson1"
 
@@ -621,23 +621,23 @@ def test_messages_array_grows_correctly(mock_anthropic_client):
     generator.generate_response(
         query="Test query",
         tools=tool_manager.get_tool_definitions(),
-        tool_manager=tool_manager
+        tool_manager=tool_manager,
     )
 
     # Capture all API calls
     calls = mock_anthropic_client.messages.create.call_args_list
 
     # Verify: 1st call has 1 message (user query)
-    first_call_messages = calls[0].kwargs['messages']
+    first_call_messages = calls[0].kwargs["messages"]
     assert len(first_call_messages) == 1
-    assert first_call_messages[0]['role'] == 'user'
+    assert first_call_messages[0]["role"] == "user"
 
     # Verify: 2nd call has 3 messages (user, assistant tool_use, user tool_results)
-    second_call_messages = calls[1].kwargs['messages']
+    second_call_messages = calls[1].kwargs["messages"]
     assert len(second_call_messages) == 3
-    assert second_call_messages[0]['role'] == 'user'
-    assert second_call_messages[1]['role'] == 'assistant'
-    assert second_call_messages[2]['role'] == 'user'
+    assert second_call_messages[0]["role"] == "user"
+    assert second_call_messages[1]["role"] == "assistant"
+    assert second_call_messages[2]["role"] == "user"
 
 
 def test_conversation_history_preserved_multi_round(mock_anthropic_client):
@@ -659,17 +659,14 @@ def test_conversation_history_preserved_multi_round(mock_anthropic_client):
     final_response.content = [MagicMock(text="Answer", type="text")]
     final_response.stop_reason = "end_turn"
 
-    mock_anthropic_client.messages.create.side_effect = [
-        tool_response,
-        final_response
-    ]
+    mock_anthropic_client.messages.create.side_effect = [tool_response, final_response]
 
     # Setup tool manager
     mock_store = MagicMock()
     mock_store.search.return_value = SearchResults(
         documents=["Content"],
-        metadata=[{'course_title': 'Course', 'lesson_number': 1}],
-        distances=[0.5]
+        metadata=[{"course_title": "Course", "lesson_number": 1}],
+        distances=[0.5],
     )
     mock_store.get_lesson_link.return_value = "https://example.com/lesson1"
 
@@ -685,13 +682,13 @@ def test_conversation_history_preserved_multi_round(mock_anthropic_client):
         query="Follow-up question",
         conversation_history=history,
         tools=tool_manager.get_tool_definitions(),
-        tool_manager=tool_manager
+        tool_manager=tool_manager,
     )
 
     # Verify: All API calls include history in system prompt
     calls = mock_anthropic_client.messages.create.call_args_list
     for call in calls:
-        system_content = call.kwargs['system']
+        system_content = call.kwargs["system"]
         assert "Previous conversation:" in system_content
         assert history in system_content
 
@@ -715,17 +712,14 @@ def test_tools_parameter_present_in_all_rounds(mock_anthropic_client):
     final_response.content = [MagicMock(text="Answer", type="text")]
     final_response.stop_reason = "end_turn"
 
-    mock_anthropic_client.messages.create.side_effect = [
-        tool_response,
-        final_response
-    ]
+    mock_anthropic_client.messages.create.side_effect = [tool_response, final_response]
 
     # Setup tool manager
     mock_store = MagicMock()
     mock_store.search.return_value = SearchResults(
         documents=["Content"],
-        metadata=[{'course_title': 'Course', 'lesson_number': 1}],
-        distances=[0.5]
+        metadata=[{"course_title": "Course", "lesson_number": 1}],
+        distances=[0.5],
     )
     mock_store.get_lesson_link.return_value = "https://example.com/lesson1"
 
@@ -739,12 +733,12 @@ def test_tools_parameter_present_in_all_rounds(mock_anthropic_client):
     generator.generate_response(
         query="Test query",
         tools=tool_manager.get_tool_definitions(),
-        tool_manager=tool_manager
+        tool_manager=tool_manager,
     )
 
     # Verify: All API calls include tools parameter
     calls = mock_anthropic_client.messages.create.call_args_list
     for call in calls:
-        assert 'tools' in call.kwargs
-        assert call.kwargs['tools'] is not None
-        assert 'tool_choice' in call.kwargs
+        assert "tools" in call.kwargs
+        assert call.kwargs["tools"] is not None
+        assert "tool_choice" in call.kwargs

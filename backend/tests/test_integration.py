@@ -5,30 +5,30 @@ These tests verify the complete request/response flow through the API,
 including the actual "Query failed" error that users experience.
 """
 
-import pytest
-import sys
 import os
+import sys
 from unittest.mock import MagicMock, Mock, patch
 
+import pytest
+
 # Add backend to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 def test_api_query_endpoint_structure():
     """
     Test that the /api/query endpoint exists and has correct structure.
     """
-    from fastapi.testclient import TestClient
     from app import app
+    from fastapi.testclient import TestClient
 
     client = TestClient(app)
 
     # Test with minimal valid request
     # This may fail due to MAX_RESULTS=0 bug, but we're testing structure first
-    response = client.post("/api/query", json={
-        "query": "test query",
-        "session_id": None
-    })
+    response = client.post(
+        "/api/query", json={"query": "test query", "session_id": None}
+    )
 
     # Response should have proper structure (even if it errors)
     assert response is not None
@@ -43,16 +43,15 @@ async def test_api_query_with_max_results_bug():
 
     This reproduces the actual "Query failed" user experience.
     """
-    from fastapi.testclient import TestClient
     from app import app
+    from fastapi.testclient import TestClient
 
     client = TestClient(app)
 
     # Send query request
-    response = client.post("/api/query", json={
-        "query": "What's in the course?",
-        "session_id": None
-    })
+    response = client.post(
+        "/api/query", json={"query": "What's in the course?", "session_id": None}
+    )
 
     # With MAX_RESULTS=0, the behavior depends on other factors:
     # - If Anthropic API fails: HTTP 500
@@ -75,26 +74,25 @@ async def test_api_query_with_max_results_bug():
         assert response.status_code in [401, 402, 429, 503]
 
 
-@patch('app.rag_system')
+@patch("app.rag_system")
 def test_api_query_with_mocked_rag(mock_rag_system):
     """
     Test API endpoint with mocked RAG system to isolate endpoint logic.
     """
-    from fastapi.testclient import TestClient
     from app import app
+    from fastapi.testclient import TestClient
 
     # Mock RAGSystem query method
     mock_rag_system.query.return_value = (
         "This is a test answer",
-        [{"text": "Test Course - Lesson 1", "url": "https://example.com/lesson1"}]
+        [{"text": "Test Course - Lesson 1", "url": "https://example.com/lesson1"}],
     )
 
     client = TestClient(app)
 
-    response = client.post("/api/query", json={
-        "query": "test question",
-        "session_id": "test_session_123"
-    })
+    response = client.post(
+        "/api/query", json={"query": "test question", "session_id": "test_session_123"}
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -105,22 +103,19 @@ def test_api_query_with_mocked_rag(mock_rag_system):
     assert data["session_id"] == "test_session_123"
 
 
-@patch('app.rag_system')
+@patch("app.rag_system")
 def test_api_query_creates_session_if_none(mock_rag_system):
     """
     Test that API creates a new session ID if none provided.
     """
-    from fastapi.testclient import TestClient
     from app import app
+    from fastapi.testclient import TestClient
 
     mock_rag_system.query.return_value = ("Answer", [])
 
     client = TestClient(app)
 
-    response = client.post("/api/query", json={
-        "query": "test",
-        "session_id": None
-    })
+    response = client.post("/api/query", json={"query": "test", "session_id": None})
 
     assert response.status_code == 200
     data = response.json()
@@ -131,25 +126,22 @@ def test_api_query_creates_session_if_none(mock_rag_system):
     assert len(data["session_id"]) > 0
 
 
-@patch('app.rag_system')
+@patch("app.rag_system")
 def test_api_error_handling(mock_rag_system):
     """
     Test that API exceptions are caught and returned as HTTP 500.
 
     This confirms the error handling behavior in app.py.
     """
-    from fastapi.testclient import TestClient
     from app import app
+    from fastapi.testclient import TestClient
 
     # Make RAG system raise an exception
     mock_rag_system.query.side_effect = Exception("Test error message")
 
     client = TestClient(app)
 
-    response = client.post("/api/query", json={
-        "query": "test",
-        "session_id": None
-    })
+    response = client.post("/api/query", json={"query": "test", "session_id": None})
 
     assert response.status_code == 500
     data = response.json()
@@ -157,24 +149,21 @@ def test_api_error_handling(mock_rag_system):
     assert "Test error message" in data["detail"]
 
 
-@patch('app.rag_system')
+@patch("app.rag_system")
 def test_api_anthropic_auth_error(mock_rag_system):
     """
     Test API behavior when Anthropic API authentication fails.
     """
     import anthropic
-    from fastapi.testclient import TestClient
     from app import app
+    from fastapi.testclient import TestClient
 
     # Make RAG system raise Anthropic auth error
     mock_rag_system.query.side_effect = anthropic.AuthenticationError("Invalid API key")
 
     client = TestClient(app)
 
-    response = client.post("/api/query", json={
-        "query": "test",
-        "session_id": None
-    })
+    response = client.post("/api/query", json={"query": "test", "session_id": None})
 
     # Currently returns 500 (generic error)
     # After fix, should return 401
@@ -187,8 +176,8 @@ def test_api_courses_endpoint():
     """
     Test the /api/courses endpoint returns course list.
     """
-    from fastapi.testclient import TestClient
     from app import app
+    from fastapi.testclient import TestClient
 
     client = TestClient(app)
 
@@ -200,13 +189,13 @@ def test_api_courses_endpoint():
     # May be empty if no courses loaded
 
 
-@patch('app.rag_system')
+@patch("app.rag_system")
 def test_api_courses_endpoint_returns_metadata(mock_rag_system):
     """
     Test that courses endpoint returns proper metadata structure.
     """
-    from fastapi.testclient import TestClient
     from app import app
+    from fastapi.testclient import TestClient
 
     # Mock get_all_courses_metadata
     mock_rag_system.vector_store.get_all_courses_metadata.return_value = [
@@ -214,7 +203,7 @@ def test_api_courses_endpoint_returns_metadata(mock_rag_system):
             "title": "Test Course 1",
             "instructor": "Instructor 1",
             "course_link": "https://example.com/course1",
-            "lesson_count": 5
+            "lesson_count": 5,
         }
     ]
 
@@ -232,8 +221,8 @@ def test_api_root_endpoint_serves_frontend():
     """
     Test that root endpoint serves the frontend.
     """
-    from fastapi.testclient import TestClient
     from app import app
+    from fastapi.testclient import TestClient
 
     client = TestClient(app)
 
@@ -247,8 +236,8 @@ def test_api_cors_headers():
     """
     Test CORS configuration if enabled.
     """
-    from fastapi.testclient import TestClient
     from app import app
+    from fastapi.testclient import TestClient
 
     client = TestClient(app)
 
@@ -259,22 +248,19 @@ def test_api_cors_headers():
     assert response.status_code in [200, 405]  # 405 if OPTIONS not explicitly handled
 
 
-@patch('app.rag_system')
+@patch("app.rag_system")
 def test_api_empty_query(mock_rag_system):
     """
     Test API behavior with empty query string.
     """
-    from fastapi.testclient import TestClient
     from app import app
+    from fastapi.testclient import TestClient
 
     mock_rag_system.query.return_value = ("Please provide a question", [])
 
     client = TestClient(app)
 
-    response = client.post("/api/query", json={
-        "query": "",
-        "session_id": None
-    })
+    response = client.post("/api/query", json={"query": "", "session_id": None})
 
     # Should still process (validation in app may vary)
     assert response.status_code in [200, 422, 500]
@@ -284,16 +270,19 @@ def test_api_malformed_request():
     """
     Test API with malformed request body.
     """
-    from fastapi.testclient import TestClient
     from app import app
+    from fastapi.testclient import TestClient
 
     client = TestClient(app)
 
     # Missing required field
-    response = client.post("/api/query", json={
-        "session_id": "test"
-        # Missing 'query' field
-    })
+    response = client.post(
+        "/api/query",
+        json={
+            "session_id": "test"
+            # Missing 'query' field
+        },
+    )
 
     # Should return 422 Unprocessable Entity
     assert response.status_code == 422
